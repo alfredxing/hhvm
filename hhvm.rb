@@ -1,8 +1,8 @@
 class Hhvm < Formula
   desc "JIT compiler and runtime for the PHP and Hack languages"
   homepage "http://hhvm.com/"
-  url "http://dl.hhvm.com/source/hhvm-3.21.0.tar.bz2"
-  sha256 "702a47053b88f499514edf88e71b409abbcc0d77ce01799d76d2adf5bac07478"
+  url "http://dl.hhvm.com/source/hhvm-3.22.0.tar.bz2"
+  sha256 "a5febae81b1f2d643924e8b31d66aa7538272dfef1bf87967813362b45f19621"
   revision 0
 
   head "https://github.com/facebook/hhvm.git"
@@ -13,13 +13,8 @@ class Hhvm < Formula
     for debugging HHVM itself.
   EOS
 
-  # Needs libdispatch APIs only available in Mavericks and newer.
-  depends_on :macos => :mavericks
-
-  # We need to build with upstream clang -- the version Apple ships doesn't
-  # support TLS, which HHVM uses heavily. (And gcc compiles HHVM fine, but
-  # causes ld to trip an assert and fail, for unclear reasons.)
-  depends_on "llvm" => :build
+  # Needs very recent xcode
+  depends_on :macos => :sierra
 
   depends_on "autoconf" => :build
   depends_on "automake" => :build
@@ -52,7 +47,8 @@ class Hhvm < Formula
   depends_on "libpng"
   depends_on "libxml2"
   depends_on "libzip"
-  depends_on "lz4"
+  # 1.8.0 is broken for clang + C++, needs https://github.com/lz4/lz4/commit/252ce14fd2ce8e4ff6038e79fe48a6b38643f8c9
+  depends_on "lz4@1.7.5"
   depends_on "mcrypt"
   depends_on "oniguruma"
   depends_on "openssl"
@@ -62,20 +58,6 @@ class Hhvm < Formula
   depends_on "tbb"
 
   def install
-    # Fix for 'dyld: lazy symbol binding failed: Symbol not found: _clock_gettime' issue
-    if MacOS.version == "10.11" && MacOS::Xcode.installed? && MacOS::Xcode.version >= "8.0"
-        inreplace "third-party/webscalesqlclient/mysql-5.6/config.h.cmake", "#cmakedefine HAVE_CLOCK_GETTIME 1", ""
-        ENV["ac_cv_search_clock_gettime"] = "no"
-        ENV["ac_have_clock_syscall"] = "no"
-    end
-
-    if MacOS.version == "10.10"
-      inreplace "third-party/folly/src/folly/detail/SocketFastOpen.h" do |s|
-        s.gsub! "#define FOLLY_ALLOW_TFO 1",
-                "#define FOLLY_ALLOW_TFO 0"
-      end
-    end
-
     # Work around https://github.com/Homebrew/homebrew/issues/42957 by making
     # brew's superenv forget which libraries it wants to inject into ld
     # invocations. (We tell cmake below where they all are, so we don't need
@@ -85,13 +67,6 @@ class Hhvm < Formula
     cmake_args = %W[
       -DCMAKE_INSTALL_PREFIX=#{prefix}
       -DDEFAULT_CONFIG_DIR=#{etc}/hhvm
-    ]
-
-    # Must use upstream clang -- see above.
-    cmake_args += %W[
-      -DCMAKE_CXX_COMPILER=#{Formula["llvm"].opt_bin}/clang++
-      -DCMAKE_C_COMPILER=#{Formula["llvm"].opt_bin}/clang
-      -DCMAKE_ASM_COMPILER=#{Formula["llvm"].opt_bin}/clang
     ]
 
     # Features which don't work on OS X yet since they haven't been ported yet.
@@ -155,8 +130,8 @@ class Hhvm < Formula
       -DLIBZIP_INCLUDE_DIR_ZIP=#{Formula["libzip"].opt_include}
       -DLIBZIP_INCLUDE_DIR_ZIPCONF=#{Formula["libzip"].opt_lib}/libzip/include
       -DLIBZIP_LIBRARY=#{Formula["libzip"].opt_lib}/libzip.dylib
-      -DLZ4_INCLUDE_DIR=#{Formula["lz4"].opt_include}
-      -DLZ4_LIBRARY=#{Formula["lz4"].opt_lib}/liblz4.dylib
+      -DLZ4_INCLUDE_DIR=#{Formula["lz4@1.7.5"].opt_include}
+      -DLZ4_LIBRARY=#{Formula["lz4@1.7.5"].opt_lib}/liblz4.dylib
       -DOCAML=#{Formula["ocaml"].opt_bin}/ocaml
       -DOCAMLC=#{Formula["ocaml"].opt_bin}/ocamlc.opt
       -DOCAMLOPT=#{Formula["ocaml"].opt_bin}/ocamlopt.opt
